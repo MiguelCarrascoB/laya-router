@@ -111,20 +111,27 @@ The script sends ten fixed prompts to both classifiers and prints each decision,
 opencode run --model opencode/jev-1.13-free --format json '...routing prompt...'
 ```
 
-> **Historical note (observed 2026-09-20):** the Jev provider returned HTTP 500 (`provider.internal`) for all prompts, including a trivial `Reply OK` test — a server-side outage, not an invocation problem. The script detects this and prints laya-only results with a non-zero exit, so it can be re-run as soon as Jev recovers.
+> **Run note (2026-09-20):** a comparison run with `--timeout 60` timed out on Jev's first prompt and exited 1. One retry with `--timeout 120` reached Jev but returned HTTP 500 (`provider.internal`) and also exited 1. This is consistent with the earlier server-side outage, not an invocation problem; the script printed laya-only results.
 >
 > When Jev answers, the verdict line reflects laya's published benchmarks against Jev: laya wins typed decisions (0.766 vs 0.727) and calibration (ECE 0.081 vs 0.246) at ~7× lower latency; Jev is stronger on label spaces with more than 20 options. Straightforward tasks dominate the benchmark set above, and laya-with-mock missed only 1/10 (a linguistically-trivial but multi-step case it judged medium).
 
-Example output (latencies vary):
+Real results from the 2026-09-20 run (the Jev retry remained unavailable):
 
-```text
-prompt | laya | jev | ground truth
---- | --- | --- | ---
-What is 2 + 2? | trivial | trivial | trivial
-Design a secure production architecture for a payments API | hard | hard | hard
+| Prompt | Expected | Laya (choice, confidence, latency) | Jev (choice, latency) | Laya | Jev |
+| --- | --- | --- | --- | --- | --- |
+| What is 2 + 2? | trivial | trivial, 0.960, 0.021ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Format this short list as JSON: apples, pears | trivial | trivial, 0.960, 0.006ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Translate 'good morning' into Spanish | trivial | medium, 0.890, 0.003ms | unavailable (provider 500; retried 2026-09-20) | ✗ | — |
+| Explain how to implement a REST endpoint with validation | medium | medium, 0.890, 0.002ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Write code to parse CSV rows and report malformed records | medium | medium, 0.890, 0.002ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Analyze the tradeoffs between caching and consistency | medium | medium, 0.890, 0.002ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Design a secure production architecture for a payments API | hard | hard, 0.930, 0.001ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Debug a distributed outage involving retries and duplicate writes | hard | hard, 0.930, 0.001ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Design an algorithm for scheduling dependent jobs at scale | hard | hard, 0.930, 0.001ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
+| Compare database sharding strategies under ambiguous requirements | hard | hard, 0.930, 0.002ms | unavailable (provider 500; retried 2026-09-20) | ✓ | — |
 
-Laya/Jev agreement: 80%
-Mean latency: laya 0.1ms; Jev 245.0ms
-```
+**Summary:** laya correct **9/10**; Jev **unavailable (0/10 evaluated)**; laya/Jev agreement **N/A**; mean latency: laya **0.004ms**, Jev **N/A**.
+
+_Run 2026-09-20; deterministic mock laya backend; Jev via the OpenCode CLI._
 
 If OpenCode or Jev is unavailable, laya results are still printed and the command exits non-zero. The published laya benchmark reports stronger typed decisions (0.766 vs Jev's 0.727) and calibration (ECE 0.081 vs 0.246), while Jev performs better on label spaces with more than 20 options.
