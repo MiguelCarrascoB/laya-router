@@ -49,6 +49,10 @@ The script sends ten fixed prompts to both classifiers and prints each decision,
 opencode run --model opencode/jev-1.13-free --format json '...routing prompt...'
 ```
 
+> **Known issue (2026-09-20):** the Jev provider was returning HTTP 500 (`provider.internal`) for all prompts, including a trivial `Reply OK` test — this is a server-side outage, not an invocation problem. The script detects this and prints laya-only results with a non-zero exit, so it can be re-run as soon as Jev recovers.
+>
+> When Jev answers, the verdict line reflects laya's published benchmarks against Jev: laya wins typed decisions (0.766 vs 0.727) and calibration (ECE 0.081 vs 0.246) at ~7× lower latency; Jev is stronger on label spaces with more than 20 options. Straightforward tasks dominate the benchmark set above, and laya-with-mock missed only 1/10 (a linguistically-trivial but multi-step case it judged medium).
+
 Example output (latencies vary):
 
 ```text
