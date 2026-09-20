@@ -34,3 +34,31 @@ uv run python scripts/benchmark.py -n 8
 ```
 
 The benchmark prints decisions and rough relative cost/latency savings against always selecting `deepseek-v4-pro`. Its units are illustrative rather than provider billing or measured wall-clock latency.
+
+## Jev comparison
+
+Jev (`opencode/jev-1.13-free`) is a competing decision-model API available through the OpenCode CLI. Compare it with the deterministic, offline laya backend using:
+
+```bash
+uv run python scripts/compare_jev.py
+```
+
+The script sends ten fixed prompts to both classifiers and prints each decision, ground truth, model agreement, and mean wall-clock latency. It uses this non-interactive OpenCode command internally:
+
+```bash
+opencode run --model opencode/jev-1.13-free --format json '...routing prompt...'
+```
+
+Example output (latencies vary):
+
+```text
+prompt | laya | jev | ground truth
+--- | --- | --- | ---
+What is 2 + 2? | trivial | trivial | trivial
+Design a secure production architecture for a payments API | hard | hard | hard
+
+Laya/Jev agreement: 80%
+Mean latency: laya 0.1ms; Jev 245.0ms
+```
+
+If OpenCode or Jev is unavailable, laya results are still printed and the command exits non-zero. The published laya benchmark reports stronger typed decisions (0.766 vs Jev's 0.727) and calibration (ECE 0.081 vs 0.246), while Jev performs better on label spaces with more than 20 options.
