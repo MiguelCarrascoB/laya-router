@@ -1,7 +1,19 @@
 """Inference boundary: production laya and an offline deterministic substitute."""
 
 from abc import ABC, abstractmethod
+import logging
+import time
 from typing import Any
+
+
+logger = logging.getLogger(__name__)
+
+
+def load(*args: Any, **kwargs: Any) -> Any:
+    """Load laya only when the real backend is actually used."""
+    from laya import load as laya_load  # type: ignore[import-not-found]
+
+    return laya_load(*args, **kwargs)
 
 
 ROUTE_QUESTIONS = {
@@ -49,13 +61,21 @@ class MockLayaBackend(LayaBackend):
 
 class RealLayaBackend(LayaBackend):
     name = "real"
+    model_id = "convaiinnovations/laya"
+    model_subfolder = "typed-decisions"
 
     def __init__(self) -> None:
-        from laya import Router  # type: ignore[import-not-found]
-        self._router = Router(preload=True)
+        self._agent: Any | None = None
+
+    def _get_agent(self) -> Any:
+        if self._agent is None:
+            started = time.perf_counter()
+            self._agent = load(self.model_id, subfolder=self.model_subfolder)
+            logger.info("Loaded laya model %s/%s in %.2fs", self.model_id, self.model_subfolder, time.perf_counter() - started)
+        return self._agent
 
     def predict(self, state: dict[str, Any], questions: dict[str, Any]) -> dict[str, Any]:
-        return self._router.predict(state, questions)
+        return self._get_agent().predict(state, questions)
 
 
 def build_backend(kind: str = "mock") -> LayaBackend:

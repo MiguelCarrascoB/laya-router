@@ -18,7 +18,14 @@ If uv is unavailable, create a virtualenv and install `.[dev]` with pip. The CLI
 
 The routing table is trivial → `glm-5.3-flash`, medium → `deepseek-v4.1-flash`, hard → `deepseek-v4-pro`. Classifications below 0.85 confidence escalate to the pro model. Triage blocks injection risk at 0.9 and reports urgency on a 1–5 scale.
 
-The default `MockLayaBackend` is deterministic and needs no model download. To use laya, install the optional dependency and set `LAYA_BACKEND=real`; `RealLayaBackend` calls `Router(preload=True)` and the same `predict(state, questions)` interface. The exact laya checkpoint behavior/API should be verified against the installed `laya==0.3.4` package before production use; base checkpoints are not suitable zero-shot.
+The default `MockLayaBackend` is deterministic and needs no model download. To use the verified real backend, install the optional dependency and set `LAYA_BACKEND=real`:
+
+```bash
+uv sync --extra real
+LAYA_BACKEND=real uv run uvicorn laya_router.service:app
+```
+
+`RealLayaBackend` lazily calls `laya.load("convaiinnovations/laya", subfolder="typed-decisions")` on its first prediction and then uses laya's `predict(state, questions)` interface. With `laya==0.3.4`, loading takes about 25 seconds and the first CPU inference about 1.4 seconds in this environment; loading is logged and `/health` stays fast. The `typed-decisions` checkpoint is the workflow-decision model (the `laya` and `multilingual` subfolders are also available). Real laya confidence values can be low (for example, 0.126), so the default 0.85 escalation gate will commonly route to `deepseek-v4-pro`; do not replace laya's own confidence with a fabricated value. Set `ROUTE_CONFIDENCE_GATE` to change the gate, for example `ROUTE_CONFIDENCE_GATE=0.7`.
 
 ## Benchmark
 
