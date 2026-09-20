@@ -59,6 +59,36 @@ class MockLayaBackend(LayaBackend):
         return {"answers": answers, "backend": self.name}
 
 
+def _clamp_scores_to_criteria(raw: dict[str, Any], questions: dict[str, Any]) -> dict[str, Any]:
+    """Clamp laya "score" answers into the range requested by their question.
+
+    The real model occasionally answers outside its criteria (observed:
+    urgency 0 against a 1-5 scale, which crashed the response schema with
+    a 500). The backend boundary clamps to the nearest in-range value and
+    logs the adjustment instead of silently fabricating or crashing.
+    """
+    if "answers" not in raw:
+        return raw
+    answers = dict(raw["answers"])
+    for key, question in questions.items():
+        if question.get("type") != "score":
+            continue
+        criteria = question.get("criteria") or {}
+        answer = answers.get(key)
+        if not isinstance(answer, dict) or "score" not in answer:
+            continue
+        score = answer["score"]
+        clamped = score
+        if "min" in criteria and score < criteria["min"]:
+            clamped = criteria["min"]
+        if "max" in criteria and score > criteria["max"]:
+            clamped = criteria["max"]
+        if clamped != score:
+            logger.warning("laya score for %r outside criteria %s: %r -> %r", key, criteria, score, clamped)
+            answers[key] = {**answer, "score": clamped}
+    return {**raw, "answers": answers}
+
+
 class RealLayaBackend(LayaBackend):
     name = "real"
     model_id = "convaiinnovations/laya"
@@ -75,7 +105,8 @@ class RealLayaBackend(LayaBackend):
         return self._agent
 
     def predict(self, state: dict[str, Any], questions: dict[str, Any]) -> dict[str, Any]:
-        return self._get_agent().predict(state, questions)
+        raw = self._get_agent().predict(state, questions)
+        return _clamp_scores_to_criteria(raw, questions)
 
 
 def build_backend(kind: str = "mock") -> LayaBackend:

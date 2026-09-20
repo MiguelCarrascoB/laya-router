@@ -30,16 +30,18 @@ def health() -> dict[str, str]:
 
 
 @app.post("/route", response_model=RouteResponse)
-def route(request: RouteRequest) -> JSONResponse:
+def route(request: RouteRequest):
     try:
-        return router.route(request.prompt)
+        # Validate inside the guarded boundary: a schema-violating backend
+        # answer must surface as the documented 503, never as a post-handler 500.
+        return RouteResponse(**router.route(request.prompt))
     except Exception as exc:  # noqa: BLE001 - deliberate inference-boundary guard
         return _backend_failure(exc)
 
 
 @app.post("/triage", response_model=TriageResponse)
-def triage(request: TriageRequest) -> JSONResponse:
+def triage(request: TriageRequest):
     try:
-        return router.triage(request.task, request.context)
+        return TriageResponse(**router.triage(request.task, request.context))
     except Exception as exc:  # noqa: BLE001 - deliberate inference-boundary guard
         return _backend_failure(exc)

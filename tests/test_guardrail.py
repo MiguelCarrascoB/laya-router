@@ -251,6 +251,45 @@ def test_backend_crash_is_never_a_raw_500():
         service.router = original
 
 
+class BrokenConfidenceBackend(LayaBackend):
+    """Emits a schema-violating confidence (outside the 0-1 range)."""
+
+    name = "mock"
+
+    def predict(self, state, questions):
+        return {"answers": {"complexity": {"choice": "trivial", "confidence": 1.5}}}
+
+
+def test_triage_schema_violation_returns_503_not_500():
+    # Regression test for the audited real-laya bug: urgency 0 used to escape
+    # the handler and crash FastAPI response validation with a 500.
+    import laya_router.service as service
+
+    client = TestClient(app)
+    original = service.router
+    service.router = ModelRouter(FixedTriageBackend(score=0))
+    try:
+        response = client.post("/triage", json={"task": "hello"})
+        assert response.status_code == 503
+        assert "laya backend unavailable" in response.json()["detail"]
+    finally:
+        service.router = original
+
+
+def test_route_schema_violation_returns_503_not_500():
+    import laya_router.service as service
+
+    client = TestClient(app)
+    original = service.router
+    service.router = ModelRouter(BrokenConfidenceBackend())
+    try:
+        response = client.post("/route", json={"prompt": "hello"})
+        assert response.status_code == 503
+        assert "laya backend unavailable" in response.json()["detail"]
+    finally:
+        service.router = original
+
+
 @pytest.mark.parametrize(
     ("backend_kind", "expected_name"),
     [("mock", "mock"), ("real", "real")],

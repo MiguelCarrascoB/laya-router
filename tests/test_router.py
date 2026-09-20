@@ -217,6 +217,34 @@ def test_real_backend_classify_wraps_laya_payload(monkeypatch):
     assert classification.raw["answers"]["complexity"]["choice"] == "medium"
 
 
+class ScoreAgent:
+    def __init__(self, score):
+        self.score = score
+
+    def predict(self, state, questions):
+        return {"answers": {"urgency": {"score": self.score, "confidence": 0.9}}}
+
+
+@pytest.mark.parametrize(
+    ("raw_score", "expected_score"),
+    [(0, 1), (-3, 1), (2, 2), (2.5, 2.5), (5, 5), (6, 5), (7.5, 5)],
+)
+def test_real_backend_clamps_scores_into_criteria_range(monkeypatch, raw_score, expected_score):
+    # Regression test for the audited real-laya bug: urgency 0 crashed the
+    # response schema with a 500. The backend boundary now clamps into the
+    # question's criteria range.
+    agent = ScoreAgent(raw_score)
+
+    def fake_load(*args, **kwargs):
+        return agent
+
+    monkeypatch.setattr(laya_backend, "load", fake_load)
+    backend = laya_backend.RealLayaBackend()
+    questions = {"urgency": {"type": "score", "criteria": {"min": 1, "max": 5}}}
+    raw = backend.predict({"task": "x"}, questions)
+    assert raw["answers"]["urgency"]["score"] == expected_score
+
+
 # ---------------------------------------------------------------------------
 # Service-level: latency and health
 # ---------------------------------------------------------------------------
