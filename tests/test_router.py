@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 import laya_router.laya_backend as laya_backend
 from laya_router.laya_backend import LayaBackend
-from laya_router.router import CONFIDENCE_GATE, ModelRouter
+from laya_router.router import ModelRouter
 from laya_router.service import app
 
 
@@ -71,16 +71,26 @@ def test_every_routing_table_entry_is_reachable(choice, expected_model):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("confidence", [0.0, 0.3, 0.7, 0.849, 0.85, 0.851, 0.99])
-def test_confidence_gate_boundary(confidence):
+@pytest.mark.parametrize(
+    ("confidence", "expected_escalate", "expected_model"),
+    [
+        (0.0, True, "deepseek-v4-pro"),
+        (0.3, True, "deepseek-v4-pro"),
+        (0.7, True, "deepseek-v4-pro"),
+        (0.849, True, "deepseek-v4-pro"),
+        (0.85, False, "glm-5.3-flash"),
+        (0.851, False, "glm-5.3-flash"),
+        (0.99, False, "glm-5.3-flash"),
+    ],
+)
+def test_confidence_gate_boundary(confidence, expected_escalate, expected_model):
+    # Explicit expectations, not the production predicate recomputed: the
+    # gate is strict (<), so exactly 0.85 does NOT escalate.
     router = ModelRouter(StaticBackend(choice="trivial", confidence=confidence))
     result = router.route("anything")
-    assert result["escalate"] is (confidence < CONFIDENCE_GATE)
+    assert result["escalate"] is expected_escalate
     assert result["confidence"] == confidence
-    if confidence < CONFIDENCE_GATE:
-        assert result["model"] == "deepseek-v4-pro"
-    else:
-        assert result["model"] == "glm-5.3-flash"
+    assert result["model"] == expected_model
 
 
 def test_confidence_gate_escalates():
@@ -95,12 +105,22 @@ def test_confidence_gate_from_environment(monkeypatch):
     assert router.confidence_threshold == 0.95
 
 
-@pytest.mark.parametrize("gate", ["0.5", "0.7", "0.99"])
-def test_confidence_gate_env_override_changes_escalation(monkeypatch, gate):
+@pytest.mark.parametrize(
+    ("gate", "expected_escalate", "expected_model"),
+    [
+        ("0.5", False, "glm-5.3-flash"),
+        ("0.7", False, "glm-5.3-flash"),
+        ("0.99", True, "deepseek-v4-pro"),
+    ],
+)
+def test_confidence_gate_env_override_changes_escalation(monkeypatch, gate, expected_escalate, expected_model):
+    # Explicit expectations for a 0.8-confidence prompt under each gate.
     monkeypatch.setenv("ROUTE_CONFIDENCE_GATE", gate)
     router = ModelRouter(StaticBackend(choice="trivial", confidence=0.8))
     assert router.confidence_threshold == float(gate)
-    assert router.route("anything")["escalate"] is (0.8 < float(gate))
+    result = router.route("anything")
+    assert result["escalate"] is expected_escalate
+    assert result["model"] == expected_model
 
 
 def test_confidence_gate_env_beats_explicit_none(monkeypatch):
@@ -174,6 +194,9 @@ def _install_fake_agent(monkeypatch, confidence=0.91):
 
 
 def test_real_backend_laya_raw_fields_pass_through(monkeypatch):
+    # Contract under test: RealLayaBackend returns the agent's payload
+    # unmodified. The expectations below are literals (0.86 / 0.02 / 3),
+    # not values recomputed from production code.
     agent, _ = _install_fake_agent(monkeypatch, confidence=0.86)
     backend = laya_backend.RealLayaBackend()
     raw = backend.predict({"prompt": "write code"}, {"complexity": {"type": "choice"}})
