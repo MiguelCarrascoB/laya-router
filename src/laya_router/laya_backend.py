@@ -109,9 +109,20 @@ class RealLayaBackend(LayaBackend):
         return _clamp_scores_to_criteria(raw, questions)
 
 
+class FailmonkeyLayaBackend(LayaBackend):
+    """Always-fails backend for exercising the 503 convention over HTTP."""
+
+    name = "failmonkey"
+
+    def predict(self, state: dict[str, Any], questions: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("failmonkey: simulated laya backend failure")
+
+
 def build_backend(kind: str = "mock") -> LayaBackend:
     if kind == "real":
         return RealLayaBackend()
+    if kind == "failmonkey":
+        return FailmonkeyLayaBackend()
     if kind != "mock":
-        raise ValueError("backend must be 'mock' or 'real'")
+        raise ValueError("backend must be 'mock', 'real', or 'failmonkey'")
     return MockLayaBackend()

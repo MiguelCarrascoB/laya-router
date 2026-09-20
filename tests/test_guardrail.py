@@ -5,7 +5,9 @@ Documents intended behavior of the mock backend:
 - urgency 1..5 passes straight through to the response schema
 - canonical keyword injections are flagged; encodings (base64, roleplay
   without keywords) are NOT flagged by the mock - a documented limitation
-- any failure inside the laya inference boundary -> 503 with {"detail": ...}
+- any failure inside the laya inference boundary -> 503 with {"detail": ...},
+  including schema-violating backend answers and the always-failing
+  LAYA_BACKEND=failmonkey backend
 """
 
 import pytest
@@ -290,9 +292,28 @@ def test_route_schema_violation_returns_503_not_500():
         service.router = original
 
 
+def test_failmonkey_backend_surfaces_503_on_both_endpoints():
+    # LAYA_BACKEND=failmonkey selects an always-failing backend so the
+    # documented 503 convention is exercisable over real HTTP.
+    import laya_router.service as service
+
+    client = TestClient(app)
+    original = service.router
+    service.router = ModelRouter(laya_backend.FailmonkeyLayaBackend())
+    try:
+        route = client.post("/route", json={"prompt": "hello"})
+        assert route.status_code == 503
+        assert "failmonkey" in route.json()["detail"]
+        triage = client.post("/triage", json={"task": "hello"})
+        assert triage.status_code == 503
+        assert "failmonkey" in triage.json()["detail"]
+    finally:
+        service.router = original
+
+
 @pytest.mark.parametrize(
     ("backend_kind", "expected_name"),
-    [("mock", "mock"), ("real", "real")],
+    [("mock", "mock"), ("real", "real"), ("failmonkey", "failmonkey")],
 )
 def test_build_backend_dispatch(backend_kind, expected_name):
     assert laya_backend.build_backend(backend_kind).name == expected_name
