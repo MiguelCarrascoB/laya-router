@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import FastAPI
@@ -14,13 +15,17 @@ app = FastAPI(title="Laya Model Router", version="0.1.0")
 # Documented convention: any failure raised by the laya inference boundary
 # (crash, timeout, malformed laya payload) surfaces as 503 Service Unavailable
 # with a JSON {"detail": ...} body, never a 500 stack trace.
-BACKUP_UNAVAILABLE_STATUS = 503
+BACKEND_UNAVAILABLE_STATUS = 503
+
+logger = logging.getLogger(__name__)
 
 
 def _backend_failure(exc: Exception) -> JSONResponse:
+    # Log the cause server-side; clients only get a generic message.
+    logger.error("laya backend failure: %s: %s", type(exc).__name__, exc)
     return JSONResponse(
-        status_code=BACKUP_UNAVAILABLE_STATUS,
-        content={"detail": f"laya backend unavailable: {type(exc).__name__}: {exc}"},
+        status_code=BACKEND_UNAVAILABLE_STATUS,
+        content={"detail": "laya backend unavailable"},
     )
 
 
