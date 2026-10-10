@@ -27,7 +27,7 @@ class ModelRouter:
     def route(self, prompt: str) -> dict[str, Any]:
         result = self.classify(prompt)
         escalate = result.confidence < self.confidence_threshold
-        return {"model": "deepseek-v4-pro" if escalate else ROUTING_TABLE[result.complexity], "confidence": result.confidence, "escalate": escalate, "laya_raw": result.raw}
+        return {"model": ROUTING_TABLE["hard"] if escalate else ROUTING_TABLE[result.complexity], "confidence": result.confidence, "escalate": escalate, "laya_raw": result.raw}
 
     def triage(self, task: str, context: str = "") -> dict[str, Any]:
         # The guardrail module owns triage; the router delegates so both
