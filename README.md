@@ -129,6 +129,10 @@ Every test runs offline against the mock backend or fake laya agents, so no mode
 
 <!-- TODO: add a short demo GIF or asciinema of /route and /triage -->
 
+## Related
+
+- **[laya-self-evolving-router](https://github.com/MiguelCarrascoB/laya-self-evolving-router)**: uses Laya the other way round. Instead of a fixed set of labels, the router starts with none and grows its own categories as prompts arrive.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). laya is a third-party model; check its own license before using it in production.
