@@ -292,9 +292,10 @@ def test_route_schema_violation_returns_503_not_500():
         service.router = original
 
 
-def test_failmonkey_backend_surfaces_503_on_both_endpoints():
+def test_failmonkey_backend_surfaces_503_on_both_endpoints(caplog):
     # LAYA_BACKEND=failmonkey selects an always-failing backend so the
-    # documented 503 convention is exercisable over real HTTP.
+    # documented 503 convention is exercisable over real HTTP. The cause is
+    # logged server-side but never echoed to the client.
     import laya_router.service as service
 
     client = TestClient(app)
@@ -303,10 +304,11 @@ def test_failmonkey_backend_surfaces_503_on_both_endpoints():
     try:
         route = client.post("/route", json={"prompt": "hello"})
         assert route.status_code == 503
-        assert "failmonkey" in route.json()["detail"]
+        assert route.json()["detail"] == "laya backend unavailable"
         triage = client.post("/triage", json={"task": "hello"})
         assert triage.status_code == 503
-        assert "failmonkey" in triage.json()["detail"]
+        assert triage.json()["detail"] == "laya backend unavailable"
+        assert "failmonkey" in caplog.text
     finally:
         service.router = original
 
